@@ -5,9 +5,7 @@
 #
 #
 #
-#REF: https://medium.com/analytics-vidhya/an-nlp-approach-to-mining-online-reviews-using-topic-modeling-with-python-codes-9d766e783003
 #DATASET: F:\DataScience\DataSets\NLP\TopicModelling\Automotive_5.JSON
-#REF: https://www.kaggle.com/alvations/basic-nlp-with-nltk
 ############################################################################################
 import numpy as np
 import pandas as pd
