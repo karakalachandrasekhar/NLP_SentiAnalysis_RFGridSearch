@@ -76,8 +76,6 @@ ps = nltk.stem.PorterStemmer()
 from nltk.stem import WordNetLemmatizer 
 lemmatizer = WordNetLemmatizer()
 
-
-
 def clean_text(txt):
        txt=txt.lower()
        cleanr = re.compile('<.*?>')
@@ -106,13 +104,13 @@ from sklearn.model_selection import train_test_split
 from imblearn.over_sampling import SMOTE
 X_train, X_test, y_train, y_test = train_test_split(X_tfidf_df,AmaReviews['Review'], test_size=0.25, random_state=412)
 
-print("Number transactions X_train dataset: ", X_train.shape)
-print("Number transactions y_train dataset: ", y_train.shape)
-print("Number transactions X_test dataset: ", X_test.shape)
-print("Number transactions y_test dataset: ", y_test.shape)
+print("Number of transactions in X_train dataset: ", X_train.shape)
+print("Number of transactions in y_train dataset: ", y_train.shape)
+print("Number of transactions in X_test dataset: ", X_test.shape)
+print("Number of transactions in y_test dataset: ", y_test.shape)
 
-print("Before OverSampling, counts of label '1': {}".format(sum(y_train==1)))
-print("Before OverSampling, counts of label '0': {} \n".format(sum(y_train==0)))
+print("Before OverSampling, count of label '1': {}".format(sum(y_train==1)))
+print("Before OverSampling, count of label '0': {} \n".format(sum(y_train==0)))
 
 sm = SMOTE(random_state=2)
 X_train_res, y_train_res = sm.fit_sample(X_train, y_train.ravel())
@@ -120,8 +118,8 @@ X_train_res, y_train_res = sm.fit_sample(X_train, y_train.ravel())
 print('After OverSampling, the shape of train_X: {}'.format(X_train_res.shape))
 print('After OverSampling, the shape of train_y: {} \n'.format(y_train_res.shape))
 
-print("After OverSampling, counts of label '1': {}".format(sum(y_train_res==1)))
-print("After OverSampling, counts of label '0': {}".format(sum(y_train_res==0)))
+print("After OverSampling, count of label '1': {}".format(sum(y_train_res==1)))
+print("After OverSampling, count of label '0': {}".format(sum(y_train_res==0)))
 
 #RANDOM FOREST MODELLING
 from sklearn.ensemble import RandomForestClassifier
@@ -129,32 +127,6 @@ from sklearn.model_selection import KFold,cross_val_score
 from sklearn.metrics import precision_recall_fscore_support as score,accuracy_score
 
 # Initialize a Random Forest classifier with 100 trees
-# Fit the forest to the training set, using the bag of words as 
-# features and the sentiment labels as the response variable
-# Random Hyperparameter Grid
-from sklearn.model_selection import RandomizedSearchCV
-# Number of trees in random forest
-n_estimators = [int(x) for x in np.linspace(start = 10, stop = 2000, num = 10)]
-# Number of features to consider at every split
-max_features = ['auto', 'sqrt']
-# Maximum number of levels in tree
-max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
-max_depth.append(None)
-# Minimum number of samples required to split a node
-min_samples_split = [int(x) for x in np.linspace(10, 100, num = 50)]
-# Minimum number of samples required at each leaf node
-min_samples_leaf = [int(x) for x in np.linspace(10, 1000, num = 500)]
-# Method of selecting samples for training each tree
-bootstrap = [True, False]
-# Create the random grid
-random_grid = {'n_estimators': n_estimators,
-               'max_features': max_features,
-               'max_depth': max_depth,
-               'min_samples_split': min_samples_split,
-               'min_samples_leaf': min_samples_leaf,
-               'bootstrap': bootstrap}
-print(random_grid)
-
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
@@ -179,13 +151,9 @@ params= {'n_estimators':[int(x) for x in np.linspace(start = 10, stop =100, num 
          }
 import time
 GridStart = time.time()
-
-
 GridSr = GridSearchCV(rf,params,cv=3,n_jobs=-1)
 GridSr_fit = GridSr.fit(X_train_res,y_train_res)
-
 Grid_Output =pd.DataFrame(GridSr_fit.cv_results_).sort_values('mean_test_score',ascending = False)
-
 GridEnd = time.time()
 print(GridEnd - GridStart)
 
@@ -222,7 +190,7 @@ print("Random forest Grid Search Evaluation Report")
  #print("precision {}/ recall {}/ accuracy {}".format(precision,recall,acc))
  
  
- ##Build RF on base model  features
+ ##Build RF base model
  rf_base = RandomForestClassifier(n_jobs=-1)
  rf_base_model = rf_base.fit(X_train_res,y_train_res)
  y_pred_base = rf_base_model.predict(X_test)
@@ -234,7 +202,7 @@ print("Random forest Grid Search Evaluation Report")
  print("precision {}/ recall {}/ accuracy {}".format(precision,recall,acc))
  
  #Improvement with parameters tuning
- print("Accuracy increase after parameter tuning is {}".format(round((acc-acc_base)*100),2))
+ print("% of accuracy increase after parameter tuning is {}".format(round((acc-acc_base)*100),2))
  
 
 
