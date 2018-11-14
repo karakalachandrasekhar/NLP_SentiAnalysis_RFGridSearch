@@ -1,0 +1,279 @@
+############################################################################################
+#
+#
+#                           AMAZON REVIEW MODELLING
+#
+#
+#
+#REF: https://medium.com/analytics-vidhya/an-nlp-approach-to-mining-online-reviews-using-topic-modeling-with-python-codes-9d766e783003
+#DATASET: F:\DataScience\DataSets\NLP\TopicModelling\Automotive_5.JSON
+#REF: https://www.kaggle.com/alvations/basic-nlp-with-nltk
+############################################################################################
+import numpy as np
+import pandas as pd
+import string
+import re
+
+import matplotlib.pyplot as plt
+import seaborn as sns 
+
+
+import nltk
+from nltk import FreqDist
+
+#LOAD THE DATASET 
+
+AmaReviews = pd.read_json('./Automotive_5.json',lines=True)
+# =============================================================================
+# reviewerID — ID of the reviewer
+# asin — ID of the product
+# reviewerName — name of the reviewer
+# helpful — helpfulness rating of the review, e.g. 2/3
+# reviewText — text of the review
+# overall — rating of the product
+# summary — summary of the review
+# unixReviewTime — time of the review (unix time)
+# reviewTime — time of the review (raw)
+# =============================================================================
+print("Amazon Reviews dataset has {} rows and {} columns".format(AmaReviews.shape[0],AmaReviews.shape[1]))
+
+#find the missing values in the dataset
+AmaReviews.isnull().sum()
+
+#Find the distribution of star ratings
+AmaReviews['overall'].value_counts()
+# =============================================================================
+# 5    13928
+# 4     3967
+# 3     1430
+# 2      606
+# 1      542
+# =============================================================================
+
+#Create new feature 'Text_Length' in the dataset
+AmaReviews['Text_Length']=AmaReviews['reviewText'].apply(len)
+AmaReviews['Review']= np.where(AmaReviews['overall'] > 3, 1, 0)
+
+#Exploring the dataset
+###1 . 'Text_Length' Vs 'Star rating' and correlation
+plt.figure(figsize=(15,25))
+g= sns.FacetGrid(data=AmaReviews,col='overall')
+g.map(plt.hist,'Text_Length', bins = 10)
+
+#create a box plot of the text length for each star rating.
+sns.boxplot(x='overall', y='Text_Length', data=AmaReviews)
+
+
+#Find the distribution of star ratings
+AmaReviews['Review'].value_counts()
+# =============================================================================
+# 1    17895
+# 0     2578
+# =============================================================================
+sns.boxplot(x='Review', y='Text_Length', data=AmaReviews)
+
+#Text preprocessing
+StopWords = nltk.corpus.stopwords.words('english')
+ps = nltk.stem.PorterStemmer()
+from nltk.stem import WordNetLemmatizer 
+lemmatizer = WordNetLemmatizer()
+
+
+
+def clean_text(txt):
+       txt=txt.lower()
+       cleanr = re.compile('<.*?>')
+       txt = re.sub(cleanr, ' ', txt)  # remove html tags
+       txt = re.sub('[^a-zA-Z#]',' ',txt) # Remove unwanted text 
+       tokens=re.split('\W+',txt) 
+       tokens = [item for item in tokens if item != ''] # remove null/whitespace tokens
+       tokens = [lemmatizer.lemmatize(w) for w in tokens if w.lower() not in set(StopWords)]
+       # filter out short tokens
+       tokens = [w for w in tokens if len(w) > 3]       
+       return tokens
+
+
+#TF-IDF vectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf_vect = TfidfVectorizer(min_df = 50,analyzer=clean_text)
+X_tfidf_counts=tfidf_vect.fit_transform(AmaReviews['reviewText'])
+X_tfidf_counts.shape
+tfidf_vect.get_feature_names()
+#Vectorize sample 
+X_tfidf_df = pd.DataFrame(X_tfidf_counts.toarray())
+#X_tfidf_df.columns = tfidf_vect.get_feature_names()
+
+#Split Data set
+from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE
+X_train, X_test, y_train, y_test = train_test_split(X_tfidf_df,AmaReviews['Review'], test_size=0.25, random_state=412)
+
+print("Number transactions X_train dataset: ", X_train.shape)
+print("Number transactions y_train dataset: ", y_train.shape)
+print("Number transactions X_test dataset: ", X_test.shape)
+print("Number transactions y_test dataset: ", y_test.shape)
+
+print("Before OverSampling, counts of label '1': {}".format(sum(y_train==1)))
+print("Before OverSampling, counts of label '0': {} \n".format(sum(y_train==0)))
+
+sm = SMOTE(random_state=2)
+X_train_res, y_train_res = sm.fit_sample(X_train, y_train.ravel())
+
+print('After OverSampling, the shape of train_X: {}'.format(X_train_res.shape))
+print('After OverSampling, the shape of train_y: {} \n'.format(y_train_res.shape))
+
+print("After OverSampling, counts of label '1': {}".format(sum(y_train_res==1)))
+print("After OverSampling, counts of label '0': {}".format(sum(y_train_res==0)))
+
+#RANDOM FOREST MODELLING
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import KFold,cross_val_score
+from sklearn.metrics import precision_recall_fscore_support as score,accuracy_score
+
+# Initialize a Random Forest classifier with 100 trees
+# Fit the forest to the training set, using the bag of words as 
+# features and the sentiment labels as the response variable
+# Random Hyperparameter Grid
+from sklearn.model_selection import RandomizedSearchCV
+# Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 10, stop = 2000, num = 10)]
+# Number of features to consider at every split
+max_features = ['auto', 'sqrt']
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth.append(None)
+# Minimum number of samples required to split a node
+min_samples_split = [int(x) for x in np.linspace(10, 100, num = 50)]
+# Minimum number of samples required at each leaf node
+min_samples_leaf = [int(x) for x in np.linspace(10, 1000, num = 500)]
+# Method of selecting samples for training each tree
+bootstrap = [True, False]
+# Create the random grid
+random_grid = {'n_estimators': n_estimators,
+               'max_features': max_features,
+               'max_depth': max_depth,
+               'min_samples_split': min_samples_split,
+               'min_samples_leaf': min_samples_leaf,
+               'bootstrap': bootstrap}
+print(random_grid)
+
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+# Use the random grid to search for best hyperparameters
+# First create the base model to tune
+# =============================================================================
+# n_estimators = number of trees in the foreset
+# max_features = max number of features considered for splitting a node
+# max_depth = max number of levels in each decision tree
+# min_samples_split = min number of data points placed in a node before the node is split
+# min_samples_leaf = min number of data points allowed in a leaf node
+# bootstrap = method for sampling data points (with or without replacement)
+# =============================================================================
+rf = RandomForestClassifier()
+
+max_depth = [int(x) for x in np.linspace(10, 110, num = 5)]
+max_depth.append(None)
+params= {'n_estimators':[int(x) for x in np.linspace(start = 10, stop =100, num = 5)],
+         'max_depth':max_depth,
+         'max_features':['auto', 'sqrt'],
+         #'bootstrap':[True,False]
+         }
+import time
+GridStart = time.time()
+
+
+GridSr = GridSearchCV(rf,params,cv=3,n_jobs=-1)
+GridSr_fit = GridSr.fit(X_train_res,y_train_res)
+
+Grid_Output =pd.DataFrame(GridSr_fit.cv_results_).sort_values('mean_test_score',ascending = False)
+
+GridEnd = time.time()
+print(GridEnd - GridStart)
+
+GridSr_fit.best_params_
+#{'max_depth': None, 'max_features': 'auto', 'n_estimators': 100}
+GridSr_fit.best_estimator_
+# =============================================================================
+# RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
+#             max_depth=None, max_features='auto', max_leaf_nodes=None,
+#             min_impurity_decrease=0.0, min_impurity_split=None,
+#             min_samples_leaf=1, min_samples_split=2,
+#             min_weight_fraction_leaf=0.0, n_estimators=100, n_jobs=None,
+#             oob_score=False, random_state=None, verbose=0,
+#             warm_start=False)
+# =============================================================================
+#Build RF on best features
+  rf_best = RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
+            max_depth=None, max_features='auto', max_leaf_nodes=None,
+            min_impurity_decrease=0.0, min_impurity_split=None,
+            min_samples_leaf=1, min_samples_split=2,
+            min_weight_fraction_leaf=0.0, n_estimators=100, n_jobs=-1,
+            oob_score=False, random_state=None, verbose=0,
+            warm_start=False)
+  rf_best_model = rf_best.fit(X_train_res,y_train_res)
+  y_pred = rf_best_model.predict(X_test)
+
+
+from sklearn.metrics import precision_recall_fscore_support as score,accuracy_score,confusion_matrix
+
+precision,recall,fscore,support = score(y_test,y_pred)
+acc = accuracy_score(y_test,y_pred)
+cf = confusion_matrix(y_test,y_pred)
+print("Random forest Grid Search Evaluation Report")
+ #print("precision {}/ recall {}/ accuracy {}".format(precision,recall,acc))
+ 
+ 
+ ##Build RF on base model  features
+ rf_base = RandomForestClassifier(n_jobs=-1)
+ rf_base_model = rf_base.fit(X_train_res,y_train_res)
+ y_pred_base = rf_base_model.predict(X_test)
+ 
+ precision,recall,fscore,support = score(y_test,y_pred)
+ acc_base = accuracy_score(y_test,y_pred_base)
+ cf = confusion_matrix(y_test,y_pred_base)
+ print("Random forest Base Model Evaluation Report")
+ print("precision {}/ recall {}/ accuracy {}".format(precision,recall,acc))
+ 
+ #Improvement with parameters tuning
+ print("Accuracy increase after parameter tuning is {}".format(round((acc-acc_base)*100),2))
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                     
+                   
+
+
+
+
+
+
+
