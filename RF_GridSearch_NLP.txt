@@ -48,19 +48,8 @@ AmaReviews['overall'].value_counts()
 # 1      542
 # =============================================================================
 
-#Create new feature 'Text_Length' in the dataset
-AmaReviews['Text_Length']=AmaReviews['reviewText'].apply(len)
+#Create new feature 'Review' in the dataset
 AmaReviews['Review']= np.where(AmaReviews['overall'] > 3, 1, 0)
-
-#Exploring the dataset
-###1 . 'Text_Length' Vs 'Star rating' and correlation
-plt.figure(figsize=(15,25))
-g= sns.FacetGrid(data=AmaReviews,col='overall')
-g.map(plt.hist,'Text_Length', bins = 10)
-
-#create a box plot of the text length for each star rating.
-sns.boxplot(x='overall', y='Text_Length', data=AmaReviews)
-
 
 #Find the distribution of star ratings
 AmaReviews['Review'].value_counts()
@@ -68,7 +57,6 @@ AmaReviews['Review'].value_counts()
 # 1    17895
 # 0     2578
 # =============================================================================
-sns.boxplot(x='Review', y='Text_Length', data=AmaReviews)
 
 #Text preprocessing
 StopWords = nltk.corpus.stopwords.words('english')
